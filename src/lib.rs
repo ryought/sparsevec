@@ -25,9 +25,6 @@ use arrayvec::ArrayVec;
 /// * Math operations on SparseVec: Add Sub Sum
 /// * Calculate diff between two vecs
 ///
-/// ```
-/// ```
-///
 #[derive(Clone, Debug)]
 pub enum SparseVec<T: Copy + PartialOrd, Ix: Indexable, const N: usize> {
     Dense(Vec<T>, T),
@@ -211,6 +208,39 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
         match self.to_dense() {
             SparseVec::Dense(v, _) => v,
             _ => unreachable!(),
+        }
+    }
+    ///
+    /// Change a type of index (Ix: Indexable)
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// use petgraph::graph::NodeIndex;
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// assert_eq!(a[0], 5);
+    /// let b: SparseVec<u8, NodeIndex, 2> = a.switch_index();
+    /// assert_eq!(b[NodeIndex::new(0)], 5);
+    /// assert_eq!(b.to_vec(), vec![5, 4, 7, 2]);
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::sparse_from_slice(&v, 0);
+    /// assert_eq!(a[0], 5);
+    /// let b: SparseVec<u8, NodeIndex, 2> = a.switch_index();
+    /// assert_eq!(b[NodeIndex::new(0)], 5);
+    /// assert_eq!(b.to_vec(), vec![5, 0, 7, 0]);
+    /// ```
+    pub fn switch_index<Ix2: Indexable>(self) -> SparseVec<T, Ix2, N> {
+        match self {
+            SparseVec::Sparse(e, d, l) => {
+                let mut e2 = ArrayVec::new();
+                for (index, element) in e {
+                    e2.push((Ix2::new(index.index()), element));
+                }
+                SparseVec::Sparse(e2, d, l)
+            }
+            SparseVec::Dense(v, d) => SparseVec::Dense(v, d),
         }
     }
 }
