@@ -4,9 +4,12 @@
 //! Sparse vector which stores only top N largest elements
 //!
 
-// index
+// indexable
 pub mod indexable;
 pub use indexable::Indexable;
+
+// binary operations
+pub mod bin_ops;
 
 use arrayvec::ArrayVec;
 
@@ -22,8 +25,9 @@ use arrayvec::ArrayVec;
 /// * Conversion between Dense and Sparse
 ///
 /// # Todo
-/// * Math operations on SparseVec: Add Sub Sum
-/// * Calculate diff between two vecs
+/// * Binary operations
+///     * Math operations (Add Sub Sum)
+///     * Calculate diff between two vecs
 ///
 #[derive(Clone, Debug)]
 pub enum SparseVec<T: Copy + PartialOrd, Ix: Indexable, const N: usize> {
@@ -418,22 +422,6 @@ impl<'a, T: Copy + PartialOrd, Ix: Indexable, const N: usize> IntoIterator
     type IntoIter = SparseVecIterator<'a, T, Ix, N>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-//
-// Math ops
-//
-
-impl<'a, 'b, T, Ix, const N: usize> std::ops::Add<&'a SparseVec<T, Ix, N>>
-    for &'b SparseVec<T, Ix, N>
-where
-    T: Copy + PartialOrd + std::ops::Add,
-    Ix: Indexable,
-{
-    type Output = SparseVec<T, Ix, N>;
-    fn add(self, other: &'a SparseVec<T, Ix, N>) -> Self::Output {
-        unimplemented!();
     }
 }
 
