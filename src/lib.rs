@@ -492,6 +492,10 @@ mod tests {
             println!("i={} x={}", i, x);
         }
         assert_eq!(vec![0, 0, 100, 0, 0], v.to_vec());
+
+        // println!("size={}", std::mem::size_of::<SparseVec<u8, usize, 2>>());
+        // println!("size={}", std::mem::size_of::<SparseVec<u8, usize, 10>>());
+        // println!("size={}", std::mem::size_of::<SparseVec<u8, usize, 100>>());
     }
 
     #[test]
