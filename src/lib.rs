@@ -80,6 +80,16 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
         SparseVec::Sparse(ArrayVec::<(Ix, T), N>::new(), default_element, len)
     }
     ///
+    ///
+    ///
+    pub fn new(len: usize, default_element: T, is_dense: bool) -> Self {
+        if is_dense {
+            SparseVec::new_dense(len, default_element)
+        } else {
+            SparseVec::new_sparse(len, default_element)
+        }
+    }
+    ///
     /// Construct SparseVec::Dense from Vec<T>
     /// Reuse the vector as inner container of Dense
     ///
