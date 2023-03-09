@@ -1,7 +1,7 @@
 //!
 //! `SparseVec`
 //!
-//! Vector which is memory-efficient when few elements are filled.
+//! Sparse vector which stores only top N largest elements
 //!
 
 // index
@@ -11,19 +11,24 @@ pub use indexable::Indexable;
 use arrayvec::ArrayVec;
 
 ///
-/// For v: SparseVec, ix: Ix, x: T
-/// v[ix] = x
+/// Sparse vector which stores only top N largest elements
 ///
 /// # Features
 ///
 /// * Index access
-/// * Conversion between Dense and Sparse
 /// * Iterator on registered element
-/// * Math operations on SparseVec: Add Sub Sum
 /// * Vec<T> conversion
 /// * Display
-/// * diff
+/// * Conversion between Dense and Sparse
 ///
+/// # Todo
+/// * Math operations on SparseVec: Add Sub Sum
+/// * Calculate diff between two vecs
+///
+/// ```
+/// ```
+///
+#[derive(Clone, Debug)]
 pub enum SparseVec<T: Copy + PartialOrd, Ix: Indexable, const N: usize> {
     Dense(Vec<T>, T),
     Sparse(ArrayVec<(Ix, T), N>, T, usize),
@@ -36,20 +41,90 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// Construct SparseVec::Dense
     ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// let mut a: SparseVec<u8, usize, 2> = SparseVec::new_dense(5, 0);
+    /// a[0] = 20;
+    /// a[3] = 10;
+    /// assert_eq!(a.to_vec(), vec![20, 0, 0, 10, 0]);
+    /// ```
     pub fn new_dense(len: usize, default_element: T) -> Self {
         SparseVec::Dense(vec![default_element; len], default_element)
     }
     ///
     /// Construct SparseVec::Sparse
     ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// let mut a: SparseVec<u8, usize, 2> = SparseVec::new_sparse(5, 0);
+    /// a[0] = 20;
+    /// a[3] = 10;
+    /// assert_eq!(a.to_vec(), vec![20, 0, 0, 10, 0]);
+    ///
+    /// let mut b: SparseVec<u8, usize, 3> = SparseVec::new_sparse(5, 1);
+    /// b[0] = 20;
+    /// b[3] = 10;
+    /// b[4] = 5;
+    /// b[2] = 8;
+    /// assert_eq!(b.to_vec(), vec![20, 1, 8, 10, 1]);
+    ///
+    /// // Top N-1 element will be preserved in SparseVec.
+    /// let mut b: SparseVec<u8, usize, 2> = SparseVec::new_sparse(5, 1);
+    /// b[0] = 20;
+    /// b[3] = 10;
+    /// b[4] = 5;
+    /// assert_eq!(b.to_vec(), vec![20, 1, 1, 1, 5]);
+    /// ```
     pub fn new_sparse(len: usize, default_element: T) -> Self {
         SparseVec::Sparse(ArrayVec::<(Ix, T), N>::new(), default_element, len)
     }
     ///
+    /// Construct SparseVec::Dense from Vec<T>
+    /// Reuse the vector as inner container of Dense
     ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// let v = vec![5, 4, 3, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// assert_eq!(a.len(), 4);
+    /// assert_eq!(a.to_vec(), vec![5, 4, 3, 2]);
+    /// ```
+    pub fn dense_from_vec(vec: Vec<T>, default_element: T) -> Self {
+        SparseVec::Dense(vec, default_element)
+    }
     ///
-    pub fn new_sparse_from(vec: &[T], default_element: T) -> Self {
-        unimplemented!();
+    /// Construct SparseVec::Sparse from &[T]
+    /// Store top N largest elements in the slice.
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// let v = vec![5, 2, 0, 4];
+    ///
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::sparse_from_slice(&v, 0);
+    /// assert_eq!(a.len(), 4);
+    /// assert_eq!(a.to_vec(), vec![5, 0, 0, 4]);
+    ///
+    /// let a: SparseVec<u8, usize, 4> = SparseVec::sparse_from_slice(&v, 0);
+    /// assert_eq!(a.len(), 4);
+    /// assert_eq!(a.to_vec(), vec![5, 2, 0, 4]);
+    /// ```
+    pub fn sparse_from_slice(slice: &[T], default_element: T) -> Self {
+        let mut a = ArrayVec::new();
+        for (index, &element) in slice.into_iter().enumerate() {
+            if element != default_element {
+                if a.len() < N {
+                    a.push((Ix::new(index), element));
+                } else {
+                    // array is full
+                    let i = get_min_elem(&a).unwrap();
+                    // the minimum element is smaller than current element, swap them.
+                    if a[i].1 < element {
+                        a[i] = (Ix::new(index), element);
+                    }
+                }
+            }
+        }
+        SparseVec::Sparse(a, default_element, slice.len())
     }
     ///
     /// Length of vector
@@ -72,6 +147,16 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// Convert to dense
     ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let v = vec![5, 0, 0, 4];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::sparse_from_slice(&v, 0);
+    /// assert_eq!(a.len(), 4);
+    /// let b = a.to_dense();
+    /// assert_eq!(b.len(), 4);
+    /// assert_eq!(b.to_vec(), v);
+    /// ```
     pub fn to_dense(self) -> Self {
         match self {
             // if Dense, return as it is
@@ -91,14 +176,22 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// If Dense, N biggest elements are stored in the resulting SparseVec.
     ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// let b = a.to_sparse();
+    /// assert_eq!(b.len(), 4);
+    /// assert_eq!(b.to_vec(), vec![5, 0, 7, 0]);
+    /// ```
     pub fn to_sparse(self) -> Self {
         match self {
             // if Sparse, return as it is
             SparseVec::Sparse(e, d, l) => SparseVec::Sparse(e, d, l),
             // if Dense, pick N biggest elements
-            SparseVec::Dense(v, d) => {
-                // SparseVec::Sparse(e, d, l)
-                unimplemented!();
+            SparseVec::Dense(vec, default_element) => {
+                SparseVec::sparse_from_slice(&vec, default_element)
             }
         }
     }
@@ -107,10 +200,17 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// If Sparse, first converted to Dense
     ///
-    pub fn to_dense_vec(self) -> Vec<T> {
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// assert_eq!(a.to_vec(), vec![5, 4, 7, 2]);
+    /// ```
+    pub fn to_vec(self) -> Vec<T> {
         match self.to_dense() {
             SparseVec::Dense(v, _) => v,
-            SparseVec::Sparse(_, _, _) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
@@ -252,6 +352,27 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// Get iterator over registered elements `(Ix, T)`.
     ///
+    /// # Dense
+    /// (0, v[0]), (1, v[1]), (2, v[2]), ... will be produced.
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// let v = vec![5, 4, 3, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// let w: Vec<(usize, u8)> = a.iter().collect();
+    /// assert_eq!(w, vec![(0, 5), (1, 4), (2, 3), (3, 2)]);
+    /// ```
+    ///
+    /// # Sparse
+    /// (i, v[i]) for registered index i will be produced.
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    /// let v = vec![5, 4, 3, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::sparse_from_slice(&v, 0);
+    /// let w: Vec<(usize, u8)> = a.iter().collect();
+    /// assert_eq!(w, vec![(0, 5), (1, 4)]);
+    /// ```
     pub fn iter<'a>(&'a self) -> SparseVecIterator<'a, T, Ix, N> {
         SparseVecIterator {
             sparsevec: self,
@@ -322,12 +443,34 @@ mod tests {
         v[2] = 100;
         assert!(v.is_dense());
         println!("{}", v);
-        assert_eq!(vec![0, 0, 100, 0, 0], v.to_dense_vec());
+        for (i, x) in &v {
+            println!("i={} x={}", i, x);
+        }
+        assert_eq!(vec![0, 0, 100, 0, 0], v.to_vec());
 
         let mut v: SparseVec<u8, usize, 2> = SparseVec::new_sparse(5, 0);
         v[2] = 100;
         assert!(!v.is_dense());
         println!("{}", v);
-        assert_eq!(vec![0, 0, 100, 0, 0], v.to_dense_vec());
+        for (i, x) in &v {
+            println!("i={} x={}", i, x);
+        }
+        assert_eq!(vec![0, 0, 100, 0, 0], v.to_vec());
+    }
+
+    #[test]
+    fn conversion() {
+        let mut v: SparseVec<u8, usize, 2> = SparseVec::new_dense(5, 0);
+        v[2] = 100;
+        v[0] = 110;
+        v[3] = 120;
+        v[4] = 1;
+        assert!(v.is_dense());
+        println!("{}", v);
+        assert_eq!(vec![110, 0, 100, 120, 1], v.clone().to_vec());
+
+        let v = v.to_sparse();
+        println!("{}", v);
+        // assert_eq!(vec![110, 0, 0, 120, 0], v.clone().to_vec());
     }
 }
