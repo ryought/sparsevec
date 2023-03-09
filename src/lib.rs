@@ -21,10 +21,10 @@ pub const SIZE: usize = 10;
 ///
 /// # Features
 ///
-/// * dense/sparse conversion
-/// * Add Sub Sum
-/// * Index
-/// * Iterator
+/// * Index access
+/// * Conversion between Dense and Sparse
+/// * Iterator on registered element
+/// * Math operations on SparseVec: Add Sub Sum
 /// * Vec<T> conversion
 /// * Display
 /// * diff
@@ -207,6 +207,70 @@ impl<T: Copy + PartialOrd, Ix: Indexable> std::ops::IndexMut<Ix> for SparseVec<T
 }
 
 //
+// Iterator
+//
+
+///
+/// Iterator of SparseVec that iterates over the registered elements
+///
+pub struct SparseVecIterator<'a, T: Copy + PartialOrd, Ix: Indexable> {
+    ///
+    /// Reference of the original SparseVec
+    ///
+    sparsevec: &'a SparseVec<T, Ix>,
+    ///
+    /// Index of element to be produced next
+    ///
+    i: usize,
+}
+
+impl<'a, T: Copy + PartialOrd, Ix: Indexable> Iterator for SparseVecIterator<'a, T, Ix> {
+    type Item = (Ix, T);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.sparsevec {
+            SparseVec::Dense(v, _) => {
+                let i = self.i;
+                if i < v.len() {
+                    self.i += 1;
+                    Some((Ix::new(i), v[i]))
+                } else {
+                    None
+                }
+            }
+            SparseVec::Sparse(e, _, _) => {
+                let i = self.i;
+                if i < e.len() {
+                    self.i += 1;
+                    Some(e[i])
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
+    ///
+    /// Get iterator over registered elements `(Ix, T)`.
+    ///
+    pub fn iter<'a>(&'a self) -> SparseVecIterator<'a, T, Ix> {
+        SparseVecIterator {
+            sparsevec: self,
+            i: 0,
+        }
+    }
+}
+
+impl<'a, T: Copy + PartialOrd, Ix: Indexable> IntoIterator for &'a SparseVec<T, Ix> {
+    type Item = (Ix, T);
+    type IntoIter = SparseVecIterator<'a, T, Ix>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+//
 // Math ops
 //
 
@@ -256,11 +320,13 @@ mod tests {
         let mut v: SparseVec<u8, usize> = SparseVec::new_dense(5, 0);
         v[2] = 100;
         assert!(v.is_dense());
+        println!("{}", v);
         assert_eq!(vec![0, 0, 100, 0, 0], v.to_dense_vec());
 
         let mut v: SparseVec<u8, usize> = SparseVec::new_sparse(5, 0);
         v[2] = 100;
         assert!(!v.is_dense());
+        println!("{}", v);
         assert_eq!(vec![0, 0, 100, 0, 0], v.to_dense_vec());
     }
 }
