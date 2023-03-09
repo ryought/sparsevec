@@ -11,11 +11,6 @@ pub use indexable::Indexable;
 use arrayvec::ArrayVec;
 
 ///
-/// Maximum number of elements stored in SparseVec::Sparse
-///
-pub const SIZE: usize = 10;
-
-///
 /// For v: SparseVec, ix: Ix, x: T
 /// v[ix] = x
 ///
@@ -29,15 +24,15 @@ pub const SIZE: usize = 10;
 /// * Display
 /// * diff
 ///
-pub enum SparseVec<T: Copy + PartialOrd, Ix: Indexable> {
+pub enum SparseVec<T: Copy + PartialOrd, Ix: Indexable, const N: usize> {
     Dense(Vec<T>, T),
-    Sparse(ArrayVec<(Ix, T), SIZE>, T, usize),
+    Sparse(ArrayVec<(Ix, T), N>, T, usize),
 }
 
 ///
 /// Public functions of SparseVec
 ///
-impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
+impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// Construct SparseVec::Dense
     ///
@@ -48,7 +43,7 @@ impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
     /// Construct SparseVec::Sparse
     ///
     pub fn new_sparse(len: usize, default_element: T) -> Self {
-        SparseVec::Sparse(ArrayVec::<(Ix, T), SIZE>::new(), default_element, len)
+        SparseVec::Sparse(ArrayVec::<(Ix, T), N>::new(), default_element, len)
     }
     ///
     ///
@@ -94,25 +89,19 @@ impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
     ///
     /// Convert to sparse
     ///
-    /// If Dense, SIZE biggest elements are stored in the resulting SparseVec.
+    /// If Dense, N biggest elements are stored in the resulting SparseVec.
     ///
     pub fn to_sparse(self) -> Self {
         match self {
             // if Sparse, return as it is
             SparseVec::Sparse(e, d, l) => SparseVec::Sparse(e, d, l),
-            // if Dense, pick SIZE biggest elements
+            // if Dense, pick N biggest elements
             SparseVec::Dense(v, d) => {
                 // SparseVec::Sparse(e, d, l)
                 unimplemented!();
             }
         }
     }
-}
-
-///
-/// Internal functions of SparseVec
-///
-impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
     ///
     /// Eject Vec<T> from SparseVec::Dense
     ///
@@ -133,7 +122,10 @@ impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
 /// Otherwise, return the index of elements array.
 /// Note that this is not an index of global SparseVec.
 ///
-fn get_min_elem<Ix, T: PartialOrd + Copy>(array: &ArrayVec<(Ix, T), SIZE>) -> Option<usize> {
+fn get_min_elem<Ix, T, const N: usize>(array: &ArrayVec<(Ix, T), N>) -> Option<usize>
+where
+    T: PartialOrd + Copy,
+{
     if array.len() == 0 {
         None
     } else {
@@ -156,7 +148,9 @@ fn get_min_elem<Ix, T: PartialOrd + Copy>(array: &ArrayVec<(Ix, T), SIZE>) -> Op
 // Index
 //
 
-impl<T: Copy + PartialOrd, Ix: Indexable> std::ops::Index<Ix> for SparseVec<T, Ix> {
+impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> std::ops::Index<Ix>
+    for SparseVec<T, Ix, N>
+{
     type Output = T;
     fn index(&self, index: Ix) -> &Self::Output {
         match self {
@@ -177,7 +171,9 @@ impl<T: Copy + PartialOrd, Ix: Indexable> std::ops::Index<Ix> for SparseVec<T, I
     }
 }
 
-impl<T: Copy + PartialOrd, Ix: Indexable> std::ops::IndexMut<Ix> for SparseVec<T, Ix> {
+impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> std::ops::IndexMut<Ix>
+    for SparseVec<T, Ix, N>
+{
     fn index_mut(&mut self, index: Ix) -> &mut Self::Output {
         match self {
             SparseVec::Dense(vec, _) => &mut vec[index.index()],
@@ -191,7 +187,7 @@ impl<T: Copy + PartialOrd, Ix: Indexable> std::ops::IndexMut<Ix> for SparseVec<T
                 }
 
                 // If full, delete smallest element and write onto it.
-                if elements.len() == SIZE {
+                if elements.len() == N {
                     let i = get_min_elem(elements).unwrap();
                     elements[i].0 = index;
                     return &mut elements[i].1;
@@ -213,18 +209,20 @@ impl<T: Copy + PartialOrd, Ix: Indexable> std::ops::IndexMut<Ix> for SparseVec<T
 ///
 /// Iterator of SparseVec that iterates over the registered elements
 ///
-pub struct SparseVecIterator<'a, T: Copy + PartialOrd, Ix: Indexable> {
+pub struct SparseVecIterator<'a, T: Copy + PartialOrd, Ix: Indexable, const N: usize> {
     ///
     /// Reference of the original SparseVec
     ///
-    sparsevec: &'a SparseVec<T, Ix>,
+    sparsevec: &'a SparseVec<T, Ix, N>,
     ///
     /// Index of element to be produced next
     ///
     i: usize,
 }
 
-impl<'a, T: Copy + PartialOrd, Ix: Indexable> Iterator for SparseVecIterator<'a, T, Ix> {
+impl<'a, T: Copy + PartialOrd, Ix: Indexable, const N: usize> Iterator
+    for SparseVecIterator<'a, T, Ix, N>
+{
     type Item = (Ix, T);
     fn next(&mut self) -> Option<Self::Item> {
         match self.sparsevec {
@@ -250,11 +248,11 @@ impl<'a, T: Copy + PartialOrd, Ix: Indexable> Iterator for SparseVecIterator<'a,
     }
 }
 
-impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
+impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     ///
     /// Get iterator over registered elements `(Ix, T)`.
     ///
-    pub fn iter<'a>(&'a self) -> SparseVecIterator<'a, T, Ix> {
+    pub fn iter<'a>(&'a self) -> SparseVecIterator<'a, T, Ix, N> {
         SparseVecIterator {
             sparsevec: self,
             i: 0,
@@ -262,9 +260,11 @@ impl<T: Copy + PartialOrd, Ix: Indexable> SparseVec<T, Ix> {
     }
 }
 
-impl<'a, T: Copy + PartialOrd, Ix: Indexable> IntoIterator for &'a SparseVec<T, Ix> {
+impl<'a, T: Copy + PartialOrd, Ix: Indexable, const N: usize> IntoIterator
+    for &'a SparseVec<T, Ix, N>
+{
     type Item = (Ix, T);
-    type IntoIter = SparseVecIterator<'a, T, Ix>;
+    type IntoIter = SparseVecIterator<'a, T, Ix, N>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -274,13 +274,14 @@ impl<'a, T: Copy + PartialOrd, Ix: Indexable> IntoIterator for &'a SparseVec<T, 
 // Math ops
 //
 
-impl<'a, 'b, T, Ix> std::ops::Add<&'a SparseVec<T, Ix>> for &'b SparseVec<T, Ix>
+impl<'a, 'b, T, Ix, const N: usize> std::ops::Add<&'a SparseVec<T, Ix, N>>
+    for &'b SparseVec<T, Ix, N>
 where
     T: Copy + PartialOrd + std::ops::Add,
     Ix: Indexable,
 {
-    type Output = SparseVec<T, Ix>;
-    fn add(self, other: &'a SparseVec<T, Ix>) -> Self::Output {
+    type Output = SparseVec<T, Ix, N>;
+    fn add(self, other: &'a SparseVec<T, Ix, N>) -> Self::Output {
         unimplemented!();
     }
 }
@@ -289,7 +290,7 @@ where
 // Display
 //
 
-impl<T, Ix> std::fmt::Display for SparseVec<T, Ix>
+impl<T, Ix, const N: usize> std::fmt::Display for SparseVec<T, Ix, N>
 where
     T: Copy + PartialOrd + std::fmt::Display,
     Ix: Indexable,
@@ -317,13 +318,13 @@ mod tests {
 
     #[test]
     fn construction() {
-        let mut v: SparseVec<u8, usize> = SparseVec::new_dense(5, 0);
+        let mut v: SparseVec<u8, usize, 2> = SparseVec::new_dense(5, 0);
         v[2] = 100;
         assert!(v.is_dense());
         println!("{}", v);
         assert_eq!(vec![0, 0, 100, 0, 0], v.to_dense_vec());
 
-        let mut v: SparseVec<u8, usize> = SparseVec::new_sparse(5, 0);
+        let mut v: SparseVec<u8, usize, 2> = SparseVec::new_sparse(5, 0);
         v[2] = 100;
         assert!(!v.is_dense());
         println!("{}", v);
