@@ -26,7 +26,7 @@ use arrayvec::ArrayVec;
 ///
 /// # Todo
 /// * Binary operations
-///     * Math operations (Add Sub Sum)
+///     * Math operations (Add Sub)
 ///     * Calculate diff between two vecs
 ///
 #[derive(Clone, Debug)]
@@ -146,6 +146,15 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
         }
     }
     ///
+    /// Get default element of SparseVec
+    ///
+    pub fn default_element(&self) -> T {
+        match self {
+            SparseVec::Dense(_, d) => *d,
+            SparseVec::Sparse(_, d, _) => *d,
+        }
+    }
+    ///
     /// Convert to dense
     ///
     /// ```
@@ -246,6 +255,15 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
             }
             SparseVec::Dense(v, d) => SparseVec::Dense(v, d),
         }
+    }
+}
+
+impl<T: Copy + PartialOrd + std::iter::Sum, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
+    ///
+    /// Sum of all elements
+    ///
+    pub fn sum(&self) -> T {
+        (0..self.len()).map(|i| self[Ix::new(i)]).sum()
     }
 }
 
