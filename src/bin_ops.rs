@@ -64,6 +64,68 @@ where
     }
 }
 
+impl<'a, 'b, T, Ix, const N: usize> std::ops::Mul<&'a SparseVec<T, Ix, N>>
+    for &'b SparseVec<T, Ix, N>
+where
+    T: Copy + PartialOrd + std::ops::Mul<Output = T>,
+    Ix: Indexable,
+{
+    type Output = SparseVec<T, Ix, N>;
+    fn mul(self, other: &'a SparseVec<T, Ix, N>) -> Self::Output {
+        assert_eq!(self.len(), other.len(), "size is different");
+        if self.is_dense() || other.is_dense() {
+            let mut ret = SparseVec::new_dense(self.len(), self.default_element());
+            for i in 0..self.len() {
+                let ix = Ix::new(i);
+                ret[ix] = self[ix] * other[ix];
+            }
+            ret
+        } else {
+            unimplemented!();
+        }
+    }
+}
+
+impl<T, Ix, const N: usize> std::ops::Div<T> for SparseVec<T, Ix, N>
+where
+    T: Copy + PartialOrd + std::ops::Div<Output = T>,
+    Ix: Indexable,
+{
+    type Output = SparseVec<T, Ix, N>;
+    fn div(self, other: T) -> Self::Output {
+        match self {
+            SparseVec::Dense(mut vec, default_element) => {
+                for i in 0..vec.len() {
+                    vec[i] = vec[i] / other;
+                }
+                SparseVec::Dense(vec, default_element)
+            }
+            SparseVec::Sparse(mut elements, default_element, len) => {
+                for i in 0..elements.len() {
+                    let (index, value) = elements[i];
+                    elements[i] = (index, value / other);
+                }
+
+                SparseVec::Sparse(elements, default_element / other, len)
+            }
+        }
+    }
+}
+
+impl<T, Ix, const N: usize> std::iter::Sum for SparseVec<T, Ix, N>
+where
+    T: Copy + PartialOrd + std::ops::AddAssign,
+    Ix: Indexable,
+{
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|mut a, b| {
+            a += &b;
+            a
+        })
+        .unwrap()
+    }
+}
+
 //
 // Tests
 //
