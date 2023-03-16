@@ -135,13 +135,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn add() {
-        let mut a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0);
-        let b: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(vec![1, 1, 3, 1], 0);
-        let c = &a + &b;
-        assert_eq!(c.to_vec(), vec![6, 5, 6, 2]);
+    fn add_and_mul() {
+        {
+            let mut a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0);
+            let b: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(vec![1, 1, 3, 1], 0);
+            let c = &a + &b;
+            assert_eq!(c.to_vec(), vec![6, 5, 6, 2]);
 
-        a += &b;
-        assert_eq!(a.to_vec(), vec![6, 5, 6, 2]);
+            a += &b;
+            assert_eq!(a.to_vec(), vec![6, 5, 6, 2]);
+        }
+
+        {
+            let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0);
+            let b: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(vec![1, 1, 3, 1], 0);
+            let d = &a * &b;
+            println!("d={}", d);
+            assert_eq!(d.to_vec(), vec![5, 4, 9, 1]);
+        }
+    }
+    #[test]
+    fn sum_and_div() {
+        let vs: Vec<_> = vec![
+            SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0),
+            SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0),
+            SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0),
+            SparseVec::dense_from_vec(vec![5, 4, 3, 1], 0),
+        ];
+        let s: SparseVec<u8, usize, 2> = vs.into_iter().sum();
+        println!("s={}", s);
+        assert_eq!(s.clone().to_vec(), vec![20, 16, 12, 4]);
+
+        let x = s / 4;
+        println!("x={}", x);
+        assert_eq!(x.clone().to_vec(), vec![5, 4, 3, 1]);
     }
 }
