@@ -53,13 +53,8 @@ where
 {
     fn add_assign(&mut self, other: &'a SparseVec<T, Ix, N>) {
         assert_eq!(self.len(), other.len(), "size is different");
-        if self.is_dense() {
-            for i in 0..self.len() {
-                let ix = Ix::new(i);
-                self[ix] += other[ix];
-            }
-        } else {
-            panic!("AddAssign into SparseVec::Sparse is not supported yet")
+        for (index, element) in other.iter() {
+            self[index] += element;
         }
     }
 }
