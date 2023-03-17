@@ -123,16 +123,7 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
         let mut a = ArrayVec::new();
         for (index, &element) in slice.into_iter().enumerate() {
             if element != default_element {
-                if a.len() < N {
-                    a.push((Ix::new(index), element));
-                } else {
-                    // array is full
-                    let i = get_min_elem(&a).unwrap();
-                    // the minimum element is smaller than current element, swap them.
-                    if a[i].1 < element {
-                        a[i] = (Ix::new(index), element);
-                    }
-                }
+                push_elem_in_sorted(&mut a, Ix::new(index), element);
             }
         }
         SparseVec::Sparse(a, default_element, slice.len())
@@ -205,13 +196,13 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
     /// assert_eq!(b.len(), 4);
     /// assert_eq!(b.to_vec(), vec![5, 0, 7, 0]);
     /// ```
-    pub fn to_sparse(self) -> Self {
+    pub fn to_sparse(&self) -> Self {
         match self {
             // if Sparse, return as it is
-            SparseVec::Sparse(e, d, l) => SparseVec::Sparse(e, d, l),
+            SparseVec::Sparse(e, d, l) => SparseVec::Sparse(e.clone(), *d, *l),
             // if Dense, pick N biggest elements
             SparseVec::Dense(vec, default_element) => {
-                SparseVec::sparse_from_slice(&vec, default_element)
+                SparseVec::sparse_from_slice(&vec, *default_element)
             }
         }
     }
@@ -266,6 +257,68 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
             SparseVec::Dense(v, d) => SparseVec::Dense(v, d),
         }
     }
+    ///
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// let sa = a.to_top_k_indexes(2);
+    /// assert_eq!(sa.as_slice(), &[2, 0]);
+    /// let sa = a.to_top_k_indexes(1);
+    /// assert_eq!(sa.as_slice(), &[2]);
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::sparse_from_slice(&v, 0);
+    /// let sa = a.to_top_k_indexes(2);
+    /// assert_eq!(sa.as_slice(), &[2, 0]);
+    /// let sa = a.to_top_k_indexes(1);
+    /// assert_eq!(sa.as_slice(), &[2]);
+    /// ```
+    ///
+    pub fn to_top_k_indexes(&self, k: usize) -> ArrayVec<Ix, N> {
+        assert!(k <= N, "k should be 0 < k <= N");
+        self.to_sorted_arrayvec()
+            .into_iter()
+            .map(|(index, _)| index)
+            .take(k)
+            .collect()
+    }
+    ///
+    /// Convert to sorted (descending order) array vec containing top-N elements.
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::dense_from_vec(v, 0);
+    /// let sa = a.to_sorted_arrayvec();
+    /// assert_eq!(sa.as_slice(), &[(2, 7), (0, 5)]);
+    ///
+    /// let v = vec![5, 4, 7, 2];
+    /// let a: SparseVec<u8, usize, 2> = SparseVec::sparse_from_slice(&v, 0);
+    /// let sa = a.to_sorted_arrayvec();
+    /// assert_eq!(sa.as_slice(), &[(2, 7), (0, 5)]);
+    /// ```
+    pub fn to_sorted_arrayvec(&self) -> ArrayVec<(Ix, T), N> {
+        let mut a = ArrayVec::new();
+        match self {
+            SparseVec::Dense(vec, default_element) => {
+                for (index, &element) in vec.into_iter().enumerate() {
+                    if element != *default_element {
+                        push_elem_in_sorted(&mut a, Ix::new(index), element);
+                    }
+                }
+            }
+            SparseVec::Sparse(elements, _default_element, _len) => {
+                for (index, element) in elements.into_iter() {
+                    push_elem_in_sorted(&mut a, *index, *element);
+                }
+            }
+        }
+        a
+    }
 }
 
 impl<T: Copy + PartialOrd + std::iter::Sum, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
@@ -273,6 +326,17 @@ impl<T: Copy + PartialOrd + std::iter::Sum, Ix: Indexable, const N: usize> Spars
     /// Sum of all elements
     ///
     pub fn sum(&self) -> T {
+        // match self {
+        //     SparseVec::Sparse(elements, default_element, len) => {
+        //         // total sum is (sum of stored elements) plus (sum of remaining spaces)
+        //         let stored: T = elements.into_iter().map(|(_, element)| *element).sum();
+        //         // let unstored: T = (len - elements.len()) * default_element;
+        //         unimplemented!();
+        //     }
+        //     SparseVec::Dense(vec, _) => vec.iter().copied().sum(),
+        // }
+        //
+        // TODO This may be inefficient for Sparse.
         (0..self.len()).map(|i| self[Ix::new(i)]).sum()
     }
 }
@@ -286,6 +350,7 @@ impl<T: Copy + PartialOrd + std::iter::Sum, Ix: Indexable, const N: usize> Spars
 ///
 fn get_min_elem<Ix, T, const N: usize>(array: &ArrayVec<(Ix, T), N>) -> Option<usize>
 where
+    Ix: Indexable,
     T: PartialOrd + Copy,
 {
     if array.len() == 0 {
@@ -303,6 +368,45 @@ where
             }
         }
         Some(i_min)
+    }
+}
+
+///
+///
+///
+fn push_elem_in_sorted<Ix, T, const N: usize>(
+    array: &mut ArrayVec<(Ix, T), N>,
+    index: Ix,
+    element: T,
+) where
+    Ix: Indexable,
+    T: PartialOrd + Copy,
+{
+    let n = array.len();
+    if n == 0 {
+        array.push((index, element));
+    } else {
+        for i in 0..n {
+            let (index_i, element_i) = array[i];
+            if index_i.index() == index.index() {
+                panic!("duplicated index")
+            }
+            if element_i < element {
+                // insert(i)
+                // if array is full, pop the smallest element
+                if array.remaining_capacity() == 0 {
+                    array.pop();
+                }
+                array.insert(i, (index, element));
+                return;
+            }
+        }
+
+        // the element is smallest element
+        // if array has space, store it in tail
+        if array.remaining_capacity() > 0 {
+            array.push((index, element));
+        }
     }
 }
 
@@ -522,5 +626,34 @@ mod tests {
         let v = v.to_sparse();
         println!("{}", v);
         // assert_eq!(vec![110, 0, 0, 120, 0], v.clone().to_vec());
+    }
+
+    #[test]
+    fn sorted_arrayvec() {
+        let mut v: ArrayVec<(usize, usize), 4> = ArrayVec::new();
+
+        push_elem_in_sorted(&mut v, 10, 5);
+        println!("v={:?}", v);
+        assert_eq!(v.as_slice(), &[(10, 5)]);
+
+        push_elem_in_sorted(&mut v, 1, 5);
+        println!("v={:?}", v);
+        assert_eq!(v.as_slice(), &[(10, 5), (1, 5)]);
+
+        push_elem_in_sorted(&mut v, 4, 10);
+        println!("v={:?}", v);
+        assert_eq!(v.as_slice(), &[(4, 10), (10, 5), (1, 5)]);
+
+        push_elem_in_sorted(&mut v, 3, 20);
+        println!("v={:?}", v);
+        assert_eq!(v.as_slice(), &[(3, 20), (4, 10), (10, 5), (1, 5)]);
+
+        push_elem_in_sorted(&mut v, 8, 7);
+        println!("v={:?}", v);
+        assert_eq!(v.as_slice(), &[(3, 20), (4, 10), (8, 7), (10, 5)]);
+
+        push_elem_in_sorted(&mut v, 9, 10);
+        println!("v={:?}", v);
+        assert_eq!(v.as_slice(), &[(3, 20), (4, 10), (9, 10), (8, 7)]);
     }
 }

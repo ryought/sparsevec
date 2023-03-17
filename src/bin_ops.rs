@@ -126,6 +126,84 @@ where
     }
 }
 
+impl<T, Ix, const N: usize> SparseVec<T, Ix, N>
+where
+    T: Copy + PartialOrd,
+    Ix: Indexable,
+{
+    ///
+    ///
+    ///
+    pub fn sum_stable(vecs: &[SparseVec<T, Ix, N>]) {
+        unimplemented!();
+    }
+}
+
+impl<T, Ix, const N: usize> SparseVec<T, Ix, N>
+where
+    T: Copy + PartialOrd,
+    Ix: Indexable,
+{
+    ///
+    ///
+    /// # Example
+    ///
+    /// ## f64
+    ///
+    /// * L1 norm of two vecs, f = |a-b|
+    /// * L2 norm of two vecs, f = |a-b|^2
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let va = vec![1., 2., 3., 1.];
+    /// let a: SparseVec<f64, usize, 2> = SparseVec::dense_from_vec(va, 0.);
+    /// let vb = vec![0., 2., 5., 0.];
+    /// let b: SparseVec<f64, usize, 2> = SparseVec::sparse_from_slice(&vb, 0.);
+    ///
+    /// let d1 = a.diff_by(&b, |a, b| (a - b).abs());
+    /// assert_eq!(d1, 4.);
+    /// let d2 = a.diff_by(&b, |a, b| (a - b).powi(2));
+    /// assert_eq!(d2, 6.);
+    /// ```
+    ///
+    ///
+    /// ## usize
+    ///
+    /// ```
+    /// use sparsevec::SparseVec;
+    ///
+    /// let va = vec![1, 2, 3, 1];
+    /// let a: SparseVec<usize, usize, 2> = SparseVec::dense_from_vec(va, 0);
+    /// let vb = vec![0, 2, 5, 0];
+    /// let b: SparseVec<usize, usize, 2> = SparseVec::sparse_from_slice(&vb, 0);
+    ///
+    /// let d1 = a.diff_by(&b, |a, b| a.abs_diff(b));
+    /// assert_eq!(d1, 4);
+    /// let d2 = a.diff_by(&b, |a, b| a.abs_diff(b).pow(2));
+    /// assert_eq!(d2, 6);
+    /// ```
+    ///
+    pub fn diff_by<F, S>(&self, other: &SparseVec<T, Ix, N>, f: F) -> S
+    where
+        S: Default + std::ops::AddAssign,
+        F: Fn(T, T) -> S,
+    {
+        assert_eq!(
+            self.len(),
+            other.len(),
+            "diff of two vecs of different sizes cannot be calculated"
+        );
+
+        let mut ret = S::default();
+        for i in 0..self.len() {
+            let index = Ix::new(i);
+            ret += f(self[index], other[index]);
+        }
+        ret
+    }
+}
+
 //
 // Tests
 //
