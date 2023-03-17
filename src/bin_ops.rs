@@ -41,7 +41,7 @@ where
             }
             ret
         } else {
-            unimplemented!();
+            panic!("addition between two SparseVec::Sparse is not supported yet")
         }
     }
 }
@@ -59,7 +59,7 @@ where
                 self[ix] += other[ix];
             }
         } else {
-            unimplemented!();
+            panic!("AddAssign into SparseVec::Sparse is not supported yet")
         }
     }
 }
@@ -81,7 +81,7 @@ where
             }
             ret
         } else {
-            unimplemented!();
+            panic!("multiplication between two SparseVec::Sparse is not supported yet")
         }
     }
 }
