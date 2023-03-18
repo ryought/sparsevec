@@ -41,7 +41,15 @@ where
             }
             ret
         } else {
-            panic!("addition between two SparseVec::Sparse is not supported yet")
+            let mut ret =
+                SparseVec::new_sparse(self.len(), self.default_element() + other.default_element());
+            for (index, _) in self.iter() {
+                ret[index] = self[index] + other[index];
+            }
+            for (index, _) in other.iter() {
+                ret[index] = self[index] + other[index];
+            }
+            ret
         }
     }
 }
@@ -53,8 +61,31 @@ where
 {
     fn add_assign(&mut self, other: &'a SparseVec<T, Ix, N>) {
         assert_eq!(self.len(), other.len(), "size is different");
-        for (index, element) in other.iter() {
-            self[index] += element;
+        if self.is_dense() {
+            for i in 0..self.len() {
+                let ix = Ix::new(i);
+                self[ix] += other[ix];
+            }
+        } else {
+            if other.is_dense() {
+                panic!("cannot AddAssign dense into sparse")
+            }
+            let mut default_element = self.default_element();
+            default_element += other.default_element();
+            let mut ret = SparseVec::new_sparse(self.len(), default_element);
+            // self
+            for (index, _) in self.iter() {
+                let mut x = self[index];
+                x += other[index];
+                ret[index] = x;
+            }
+            // other
+            for (index, _) in other.iter() {
+                let mut x = other[index];
+                x += self[index];
+                ret[index] = x;
+            }
+            *self = ret;
         }
     }
 }
@@ -76,7 +107,51 @@ where
             }
             ret
         } else {
-            panic!("multiplication between two SparseVec::Sparse is not supported yet")
+            let mut ret =
+                SparseVec::new_sparse(self.len(), self.default_element() * other.default_element());
+            for (index, _) in self.iter() {
+                ret[index] = self[index] * other[index];
+            }
+            for (index, _) in other.iter() {
+                ret[index] = self[index] * other[index];
+            }
+            ret
+        }
+    }
+}
+
+impl<'a, T, Ix, const N: usize> std::ops::MulAssign<&'a SparseVec<T, Ix, N>> for SparseVec<T, Ix, N>
+where
+    T: Copy + PartialOrd + std::ops::MulAssign,
+    Ix: Indexable,
+{
+    fn mul_assign(&mut self, other: &'a SparseVec<T, Ix, N>) {
+        assert_eq!(self.len(), other.len(), "size is different");
+        if self.is_dense() {
+            for i in 0..self.len() {
+                let ix = Ix::new(i);
+                self[ix] *= other[ix];
+            }
+        } else {
+            if other.is_dense() {
+                panic!("cannot MulAssign dense into sparse")
+            }
+            let mut default_element = self.default_element();
+            default_element *= other.default_element();
+            let mut ret = SparseVec::new_sparse(self.len(), default_element);
+            // self
+            for (index, _) in self.iter() {
+                let mut x = self[index];
+                x *= other[index];
+                ret[index] = x;
+            }
+            // other
+            for (index, _) in other.iter() {
+                let mut x = other[index];
+                x *= self[index];
+                ret[index] = x;
+            }
+            *self = ret;
         }
     }
 }
@@ -242,5 +317,40 @@ mod tests {
         let x = s / 4;
         println!("x={}", x);
         assert_eq!(x.clone().to_vec(), vec![5, 4, 3, 1]);
+    }
+    #[test]
+    fn add_and_addassign_between_sparse() {
+        let a: SparseVec<u8, usize, 3> = SparseVec::sparse_from_slice(&[5, 6, 1, 3, 0, 0, 0], 0);
+        let b: SparseVec<u8, usize, 3> = SparseVec::sparse_from_slice(&[0, 0, 3, 4, 7, 5, 0], 0);
+        let c = &a + &b;
+        println!("{}", a);
+        println!("{}", b);
+        println!("{}", c);
+        assert_eq!(a.clone().to_vec(), vec![5, 6, 0, 3, 0, 0, 0]);
+        assert_eq!(b.clone().to_vec(), vec![0, 0, 0, 4, 7, 5, 0]);
+        assert_eq!(c.clone().to_vec(), vec![0, 0, 0, 7, 7, 5, 0]);
+
+        let mut c: SparseVec<u8, usize, 3> = SparseVec::new_dense(a.len(), 0);
+        c += &a;
+        c += &b;
+        println!("{}", c);
+        assert_eq!(c.clone().to_vec(), vec![5, 6, 0, 7, 7, 5, 0]); // top-(N-1)=2 elements are
+                                                                   // keeped
+
+        // non-zero default element
+        let a: SparseVec<u8, usize, 3> = SparseVec::sparse_from_slice(&[5, 6, 1, 3, 0, 0, 0], 2);
+        let b: SparseVec<u8, usize, 3> = SparseVec::sparse_from_slice(&[0, 0, 3, 4, 7, 5, 0], 1);
+        let c = &a + &b;
+        let mut d: SparseVec<u8, usize, 3> = SparseVec::new_dense(a.len(), 0);
+        d += &a;
+        d += &b;
+        println!("{}", a);
+        println!("{}", b);
+        println!("{}", c);
+        println!("{}", d);
+        assert_eq!(a.clone().to_vec(), vec![5, 6, 2, 3, 2, 2, 2]);
+        assert_eq!(b.clone().to_vec(), vec![1, 1, 1, 4, 7, 5, 1]);
+        assert_eq!(c.clone().to_vec(), vec![3, 3, 3, 7, 9, 7, 3]);
+        assert_eq!(d.clone().to_vec(), vec![6, 7, 3, 7, 9, 7, 3]);
     }
 }
