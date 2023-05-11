@@ -10,3 +10,8 @@ authors = ["Ryo Nakabayashi <ryonakabayashi@gmail.com>"]
 arrayvec = "*"
 itertools = "*"
 petgraph = "*"
+num-traits = "*"
+
+[dev-dependencies]
+rand = "*"
+rand_xoshiro = "*"

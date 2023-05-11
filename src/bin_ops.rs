@@ -27,7 +27,7 @@ use super::*;
 impl<'a, 'b, T, Ix, const N: usize> std::ops::Add<&'a SparseVec<T, Ix, N>>
     for &'b SparseVec<T, Ix, N>
 where
-    T: Copy + PartialOrd + std::ops::Add<Output = T>,
+    T: Copy + PartialOrd + num_traits::Zero,
     Ix: Indexable,
 {
     type Output = SparseVec<T, Ix, N>;
@@ -56,15 +56,21 @@ where
 
 impl<'a, T, Ix, const N: usize> std::ops::AddAssign<&'a SparseVec<T, Ix, N>> for SparseVec<T, Ix, N>
 where
-    T: Copy + PartialOrd + std::ops::AddAssign,
+    T: Copy + PartialOrd + num_traits::Zero + std::ops::AddAssign,
     Ix: Indexable,
 {
     fn add_assign(&mut self, other: &'a SparseVec<T, Ix, N>) {
         assert_eq!(self.len(), other.len(), "size is different");
         if self.is_dense() {
-            for i in 0..self.len() {
-                let ix = Ix::new(i);
-                self[ix] += other[ix];
+            if other.default_element().is_zero() {
+                for (ix, x) in other.iter() {
+                    self[ix] += x
+                }
+            } else {
+                for i in 0..self.len() {
+                    let ix = Ix::new(i);
+                    self[ix] += other[ix];
+                }
             }
         } else {
             if other.is_dense() {
@@ -93,7 +99,7 @@ where
 impl<'a, 'b, T, Ix, const N: usize> std::ops::Mul<&'a SparseVec<T, Ix, N>>
     for &'b SparseVec<T, Ix, N>
 where
-    T: Copy + PartialOrd + std::ops::Mul<Output = T>,
+    T: Copy + PartialOrd + num_traits::One,
     Ix: Indexable,
 {
     type Output = SparseVec<T, Ix, N>;
@@ -122,15 +128,21 @@ where
 
 impl<'a, T, Ix, const N: usize> std::ops::MulAssign<&'a SparseVec<T, Ix, N>> for SparseVec<T, Ix, N>
 where
-    T: Copy + PartialOrd + std::ops::MulAssign,
+    T: Copy + PartialOrd + num_traits::One + std::ops::MulAssign,
     Ix: Indexable,
 {
     fn mul_assign(&mut self, other: &'a SparseVec<T, Ix, N>) {
         assert_eq!(self.len(), other.len(), "size is different");
         if self.is_dense() {
-            for i in 0..self.len() {
-                let ix = Ix::new(i);
-                self[ix] *= other[ix];
+            if other.default_element().is_one() {
+                for (ix, x) in other.iter() {
+                    self[ix] *= x
+                }
+            } else {
+                for i in 0..self.len() {
+                    let ix = Ix::new(i);
+                    self[ix] *= other[ix];
+                }
             }
         } else {
             if other.is_dense() {
@@ -184,7 +196,7 @@ where
 
 impl<T, Ix, const N: usize> std::iter::Sum for SparseVec<T, Ix, N>
 where
-    T: Copy + PartialOrd + std::ops::AddAssign,
+    T: Copy + PartialOrd + num_traits::Zero + std::ops::AddAssign,
     Ix: Indexable,
 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
@@ -352,5 +364,30 @@ mod tests {
         assert_eq!(b.clone().to_vec(), vec![1, 1, 1, 4, 7, 5, 1]);
         assert_eq!(c.clone().to_vec(), vec![3, 3, 3, 7, 9, 7, 3]);
         assert_eq!(d.clone().to_vec(), vec![6, 7, 3, 7, 9, 7, 3]);
+    }
+    use rand::prelude::*;
+    use rand_xoshiro::Xoshiro256PlusPlus;
+    use test::Bencher;
+    fn random_vec(is_dense: bool, n: usize, m: usize, seed: u64) -> SparseVec<usize, usize, 10> {
+        let mut ret = SparseVec::new(n, 0, is_dense);
+        let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
+        for _ in 0..m {
+            let i: usize = rng.gen_range(1..n);
+            ret[i] = rng.gen_range(1..10);
+        }
+        ret
+    }
+    #[bench]
+    fn addassign_benchmark(b: &mut Bencher) {
+        let n = 1_000;
+        let mut x = random_vec(true, n, 10, 0);
+        let y = random_vec(false, n, 10, 1);
+        let z = random_vec(true, n, 10, 2);
+        println!("x={}", x);
+        println!("y={}", y);
+        b.iter(|| {
+            x += &y;
+        });
+        println!("x={}", x);
     }
 }

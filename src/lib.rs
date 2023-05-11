@@ -3,10 +3,13 @@
 //!
 //! Sparse vector which stores only top N largest elements
 //!
+#![feature(test)]
 
 // indexable
 pub mod indexable;
 pub use indexable::Indexable;
+
+extern crate test;
 
 // binary operations
 pub mod bin_ops;
