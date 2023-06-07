@@ -141,6 +141,15 @@ impl<T: Copy + PartialOrd, Ix: Indexable, const N: usize> SparseVec<T, Ix, N> {
         }
     }
     ///
+    /// Number of filled elements (i.e. the number of indices with non-zero value)
+    ///
+    pub fn n_elements(&self) -> usize {
+        match self {
+            SparseVec::Dense(vec, _) => vec.len(),
+            SparseVec::Sparse(vec, _, _) => vec.len(),
+        }
+    }
+    ///
     /// Dense or Sparse?
     ///
     pub fn is_dense(&self) -> bool {
